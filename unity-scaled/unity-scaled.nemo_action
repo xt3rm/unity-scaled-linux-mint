@@ -1,0 +1,7 @@
+[Nemo Action]
+Name=Open in Unity (scaled)
+Comment=Launch this Unity project with HiDPI scaling
+Exec=unity-scaled %F
+Selection=s
+Extensions=dir;
+Quote=double

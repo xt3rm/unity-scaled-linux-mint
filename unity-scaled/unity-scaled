@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# unity-scaled — launch the Unity editor on Linux with HiDPI scaling,
+# auto-detecting the correct editor version from the project itself
+# (no hardcoded version, so it survives Unity upgrades).
+#
+# Usage:
+#   unity-scaled [PROJECT_DIR] [extra Unity args...]
+#
+# PROJECT_DIR defaults to the current directory if omitted.
+#
+# Tunables (env vars, defaults shown):
+#   GDK_SCALE=2            integer widget scale Unity actually obeys
+#   GDK_DPI_SCALE=0.5      font DPI fudge to soften 2x (try 0.5–0.8)
+#   UNITY_EDITOR_ROOT=~/Unity/Hub/Editor   where Hub installs editors
+#   UNITY_ALLOW_FALLBACK=0 set 1 to use newest installed editor if the
+#                          project's exact version isn't present
+
+set -euo pipefail
+
+# --- config / defaults -------------------------------------------------
+: "${GDK_SCALE:=2}"
+: "${GDK_DPI_SCALE:=0.5}"
+: "${UNITY_EDITOR_ROOT:=$HOME/Unity/Hub/Editor}"
+: "${UNITY_ALLOW_FALLBACK:=0}"
+export GDK_SCALE GDK_DPI_SCALE
+
+# --- resolve project path ---------------------------------------------
+project="${1:-$PWD}"
+[ $# -gt 0 ] && shift || true   # remaining args pass through to Unity
+
+if [ ! -d "$project" ]; then
+  echo "error: project dir not found: $project" >&2
+  exit 1
+fi
+project="$(realpath "$project")"
+
+version_file="$project/ProjectSettings/ProjectVersion.txt"
+if [ ! -f "$version_file" ]; then
+  echo "error: not a Unity project (missing ProjectSettings/ProjectVersion.txt): $project" >&2
+  exit 1
+fi
+
+# --- read required editor version from the project --------------------
+version="$(awk -F': ' '/^m_EditorVersion:/ {print $2; exit}' "$version_file" | tr -d '\r')"
+if [ -z "$version" ]; then
+  echo "error: couldn't read m_EditorVersion from $version_file" >&2
+  exit 1
+fi
+
+# --- locate the editor binary -----------------------------------------
+editor="$UNITY_EDITOR_ROOT/$version/Editor/Unity"
+
+if [ ! -x "$editor" ] && [ "$UNITY_ALLOW_FALLBACK" = "1" ]; then
+  echo "note: editor $version not installed; looking for newest available..." >&2
+  newest="$(ls -1 "$UNITY_EDITOR_ROOT" 2>/dev/null | sort -V | tail -n1 || true)"
+  if [ -n "$newest" ] && [ -x "$UNITY_EDITOR_ROOT/$newest/Editor/Unity" ]; then
+    echo "falling back to newest installed: $newest (project wants $version)" >&2
+    editor="$UNITY_EDITOR_ROOT/$newest/Editor/Unity"
+  fi
+fi
+
+if [ ! -x "$editor" ]; then
+  echo "error: no usable Unity editor binary found for version $version." >&2
+  echo "installed versions under $UNITY_EDITOR_ROOT:" >&2
+  ls -1 "$UNITY_EDITOR_ROOT" 2>/dev/null | sed 's/^/  /' >&2 || echo "  (none)" >&2
+  echo "install $version via Unity Hub, or re-run with UNITY_ALLOW_FALLBACK=1." >&2
+  exit 1
+fi
+
+# --- launch ------------------------------------------------------------
+echo "launching Unity $version  (GDK_SCALE=$GDK_SCALE GDK_DPI_SCALE=$GDK_DPI_SCALE)" >&2
+exec "$editor" -projectPath "$project" "$@"
