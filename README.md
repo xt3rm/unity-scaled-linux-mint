@@ -1,4 +1,4 @@
-# unity-scaled-linux
+# unity-scaled-linux-mint
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
@@ -115,6 +115,8 @@ becomes unnecessary.
 The integer-scaling diagnosis and the `GDK_SCALE` / `GDK_DPI_SCALE` workaround
 come from the Unity community forums (see the thread above). This repo just
 packages it into something you can right-click.
+
+Most of the work was done by claude.ai
 
 ## License
 
